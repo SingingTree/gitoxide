@@ -65,20 +65,23 @@ pub struct Outcome {
 impl File {
     /// Returns the trailing checksum over the entire content of this file.
     pub fn checksum(&self) -> &git_hash::oid {
-        git_hash::oid::from_bytes_unchecked(&self.data[self.data.len() - self.hash_len..])
+        let data = self.data();
+        git_hash::oid::from_bytes_unchecked(&data[data.len() - self.hash_len..])
     }
 
     /// Traverse all [commits][file::Commit] stored in this file and call `processor(commit) -> Result<(), Error>` on it.
     ///
     /// If the `processor` fails, the iteration will be stopped and the entire call results in the respective error.
-    pub fn traverse<'a, E, Processor>(&'a self, mut processor: Processor) -> Result<Outcome, Error<E>>
+    pub fn traverse<'b, E, Processor>(&'b self, mut processor: Processor) -> Result<Outcome, Error<E>>
     where
         E: std::error::Error + 'static,
-        Processor: FnMut(&file::Commit<'a>) -> Result<(), E>,
+        Processor: FnMut(&file::Commit<'b>) -> Result<(), E>,
     {
         self.verify_checksum()
             .map_err(|(actual, expected)| Error::Mismatch { actual, expected })?;
-        verify_split_chain_filename_hash(&self.path, self.checksum()).map_err(Error::Filename)?;
+        if let Some(path) = self.path() {
+            verify_split_chain_filename_hash(path, self.checksum()).map_err(Error::Filename)?;
+        }
 
         let null_id = self.object_hash().null_ref();
 
@@ -147,9 +150,9 @@ impl File {
         // Error type to support io::Error and Mismatch. As we only gain progress, there probably isn't much value
         // as these files are usually small enough to process them in less than a second, even for the large ones.
         // But it's possible, once a progress instance is passed.
-        let data_len_without_trailer = self.data.len() - self.hash_len;
+        let data_len_without_trailer = self.data().len() - self.hash_len;
         let mut hasher = git_features::hash::hasher(self.object_hash());
-        hasher.update(&self.data[..data_len_without_trailer]);
+        hasher.update(&self.data()[..data_len_without_trailer]);
         let actual = git_hash::ObjectId::from(hasher.digest().as_ref());
 
         let expected = self.checksum();

@@ -100,9 +100,9 @@ impl Graph {
             let f2 = &window[1];
             if f1.object_hash() != f2.object_hash() {
                 return Err(Error::HashVersionMismatch {
-                    path1: f1.path().to_owned(),
+                    path1: f1.path().unwrap().to_owned(), // TODO(bryce)
                     hash1: f1.object_hash(),
-                    path2: f2.path().to_owned(),
+                    path2: f2.path().unwrap().to_owned(), // TODO(bryce)
                     hash2: f2.object_hash(),
                 });
             }

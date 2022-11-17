@@ -34,6 +34,11 @@ const NO_PARENT: u32 = 0x7000_0000;
 const EXTENDED_EDGES_MASK: u32 = 0x8000_0000;
 const LAST_EXTENDED_EDGE_MASK: u32 = 0x8000_0000;
 
+/// TODO(bryce)
+enum FileData {
+    FileBacked(Mmap, PathBuf),
+    InMemory(Box<[u8]>),
+}
 /// A single commit-graph file.
 ///
 /// All operations on a `File` are local to that graph file. Since a commit graph can span multiple
@@ -42,11 +47,10 @@ pub struct File {
     base_graph_count: u8,
     base_graphs_list_offset: Option<usize>,
     commit_data_offset: usize,
-    data: Mmap,
+    data: FileData,
     extra_edges_list_range: Option<Range<usize>>,
     fan: [u32; FAN_LEN],
     oid_lookup_offset: usize,
-    path: PathBuf,
     hash_len: usize,
     object_hash: git_hash::Kind,
 }

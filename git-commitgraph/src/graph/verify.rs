@@ -105,7 +105,7 @@ impl Graph {
                     expected: file_index
                         .try_into()
                         .expect("files.len() check to protect against this"),
-                    path: file.path().to_owned(),
+                    path: file.path().unwrap().to_owned(), // TODO(bryce)
                 });
             }
 
@@ -122,7 +122,7 @@ impl Graph {
                         index: base_graph_index
                             .try_into()
                             .expect("files.len() check to protect against this"),
-                        path: file.path().to_owned(),
+                        path: file.path().unwrap().to_owned(), // TODO(bryce)
                     });
                 }
             }
@@ -184,7 +184,7 @@ impl Graph {
                             predecessor_id,
                         },
                     },
-                    path: file.path().to_owned(),
+                    path: file.path().unwrap().to_owned(), // TODO(bryce)
                 })?;
 
             max_generation = max(max_generation, file_stats.max_generation);

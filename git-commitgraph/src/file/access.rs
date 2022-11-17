@@ -8,6 +8,13 @@ use crate::file::{self, commit::Commit, File, COMMIT_DATA_ENTRY_SIZE_SANS_HASH};
 
 /// Access
 impl File {
+    pub(super) fn data(&self) -> &[u8] {
+        match self.data {
+            file::FileData::FileBacked(ref data, _) => data,
+            file::FileData::InMemory(ref data) => data,
+        }
+    }
+
     /// The number of base graphs that this file depends on.
     pub fn base_graph_count(&self) -> u8 {
         self.base_graph_count
@@ -46,13 +53,13 @@ impl File {
             .try_into()
             .expect("an architecture able to hold 32 bits of integer");
         let start = self.oid_lookup_offset + (pos * self.hash_len);
-        git_hash::oid::from_bytes_unchecked(&self.data[start..][..self.hash_len])
+        git_hash::oid::from_bytes_unchecked(&self.data()[start..][..self.hash_len])
     }
 
     /// Return an iterator over all object hashes stored in the base graph.
     pub fn iter_base_graph_ids(&self) -> impl Iterator<Item = &git_hash::oid> {
         let start = self.base_graphs_list_offset.unwrap_or(0);
-        let base_graphs_list = &self.data[start..][..self.hash_len * usize::from(self.base_graph_count)];
+        let base_graphs_list = &self.data()[start..][..self.hash_len * usize::from(self.base_graph_count)];
         base_graphs_list
             .chunks(self.hash_len)
             .map(git_hash::oid::from_bytes_unchecked)
@@ -98,13 +105,14 @@ impl File {
         self.fan[255]
     }
 
-    /// Returns the path to this file.
-    pub fn path(&self) -> &Path {
-        &self.path
+    /// Returns the path to this file if it's file backed, or None if the file is in memory.
+    pub fn path(&self) -> Option<&Path> {
+        match self.data {
+            file::FileData::FileBacked(_, ref path) => Some(path.as_path()),
+            file::FileData::InMemory(_) => None,
+        }
     }
-}
 
-impl File {
     /// Returns the byte slice for the given commit in this file's Commit Data (CDAT) chunk.
     pub(crate) fn commit_data_bytes(&self, pos: file::Position) -> &[u8] {
         assert!(
@@ -119,17 +127,20 @@ impl File {
             .expect("an architecture able to hold 32 bits of integer");
         let entry_size = self.hash_len + COMMIT_DATA_ENTRY_SIZE_SANS_HASH;
         let start = self.commit_data_offset + (pos * entry_size);
-        &self.data[start..][..entry_size]
+        &self.data()[start..][..entry_size]
     }
 
     /// Returns the byte slice for this file's entire Extra Edge List (EDGE) chunk.
     pub(crate) fn extra_edges_data(&self) -> Option<&[u8]> {
-        Some(&self.data[self.extra_edges_list_range.clone()?])
+        Some(&self.data()[self.extra_edges_list_range.clone()?])
     }
 }
 
 impl Debug for File {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, r#"File("{:?}")"#, self.path.display())
+        match self.data {
+            file::FileData::FileBacked(_, ref path) => write!(f, r#"File("{:?}")"#, path.display()),
+            file::FileData::InMemory(_) => write!(f, r#"File("In Memory File")"#),
+        }
     }
 }
